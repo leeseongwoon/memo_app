@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="memo_app"
+        android:label="메모장"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
