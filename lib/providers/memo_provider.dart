@@ -183,6 +183,17 @@ class MemoProvider with ChangeNotifier {
     return memoColors[colorIndex % memoColors.length];
   }
 
+  // 메모 ID가 데이터베이스에 존재하는지 확인
+  Future<bool> memoExists(String id) async {
+    try {
+      final memo = await DatabaseHelper.instance.getMemoById(id);
+      return memo != null;
+    } catch (e) {
+      print('메모 존재 확인 오류: $e');
+      return false;
+    }
+  }
+
   // 정렬 방식 변경
   void changeSortType(MemoSort sortType) {
     if (_sortType != sortType) {

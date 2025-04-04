@@ -42,6 +42,7 @@ class MemoCard extends StatelessWidget {
         elevation: 2,
         child: Container(
           padding: const EdgeInsets.all(16.0),
+          height: 120,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
             border: Border.all(
@@ -65,21 +66,26 @@ class MemoCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               if (memo.title.isNotEmpty) const SizedBox(height: 4),
-              Text(
-                memo.content,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
+              Expanded(
+                child: Text(
+                  memo.content,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // 폴더 정보 (전체 보기에서만 표시)
                   _buildFolderTag(context),
+                  
+                  const SizedBox(width: 8), // 폴더 태그와 날짜 사이 간격 추가
                   
                   // 날짜 정보
                   Row(
@@ -113,9 +119,9 @@ class MemoCard extends StatelessWidget {
   Widget _buildFolderTag(BuildContext context) {
     final folderProvider = Provider.of<FolderProvider>(context, listen: false);
     
-    // 현재 선택된 폴더가 있거나 메모가 어떤 폴더에도 속하지 않으면 표시하지 않음
+    // 현재 선택된 폴더가 있거나 메모가 어떤 폴더에도 속하지 않으면 빈 공간 반환
     if (folderProvider.currentFolderId.isNotEmpty || memo.folderId.isEmpty) {
-      return const SizedBox.shrink();
+      return const SizedBox(height: 22, width: 0);
     }
     
     // 메모가 속한 폴더 찾기
@@ -128,7 +134,7 @@ class MemoCard extends StatelessWidget {
     }
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.deepPurple.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -142,11 +148,16 @@ class MemoCard extends StatelessWidget {
             color: Colors.deepPurple,
           ),
           const SizedBox(width: 4),
-          Text(
-            folderName,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.deepPurple,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 80),
+            child: Text(
+              folderName,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.deepPurple,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

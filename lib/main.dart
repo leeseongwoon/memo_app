@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/memo_provider.dart';
 import 'providers/folder_provider.dart';
+import 'providers/drawing_provider.dart';
 import 'screens/memo_list_screen.dart';
 
 void main() {
@@ -17,6 +18,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => MemoProvider()),
         ChangeNotifierProvider(create: (_) => FolderProvider()),
+        ChangeNotifierProvider(create: (_) => DrawingProvider()),
       ],
       child: MaterialApp(
         title: '메모장',
