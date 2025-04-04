@@ -71,7 +71,26 @@ class FolderList extends StatelessWidget {
             // 전체 메모 항목 (루트 폴더)
             ListTile(
               leading: const Icon(Icons.folder_outlined, color: Colors.amber),
-              title: const Text('전체 메모'),
+              title: Row(
+                children: [
+                  const Expanded(child: Text('전체 메모')),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${memoProvider.getMemoCountByFolder("")}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               selected: currentFolderId.isEmpty,
               selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
               selectedColor: Theme.of(context).colorScheme.primary,
@@ -94,7 +113,26 @@ class FolderList extends StatelessWidget {
                 
                 return ListTile(
                   leading: const Icon(Icons.folder_outlined, color: Colors.amber),
-                  title: Text(folder.name),
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(folder.name)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${memoProvider.getMemoCountByFolder(folder.id)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   selected: folder.id == currentFolderId,
                   selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   selectedColor: Theme.of(context).colorScheme.primary,

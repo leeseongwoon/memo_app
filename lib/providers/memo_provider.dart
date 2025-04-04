@@ -9,7 +9,8 @@ enum MemoSort {
 }
 
 class MemoProvider with ChangeNotifier {
-  List<Memo> _memos = [];
+  List<Memo> _memos = []; // 현재 표시할 메모 목록
+  List<Memo> _allMemos = []; // 전체 메모 목록 (개수 계산용)
   MemoSort _sortType = MemoSort.latest; // 기본 정렬: 최신순
   final List<Color> memoColors = [
     const Color(0xFFF9FBE7), // 연한 라임
@@ -30,16 +31,20 @@ class MemoProvider with ChangeNotifier {
     return sortedMemos;
   }
 
+  // 모든 메모를 반환 (개수 계산용)
+  List<Memo> get allMemos => _allMemos;
+
   MemoSort get currentSortType => _sortType;
 
   MemoProvider() {
-    _loadMemos();
+    _loadAllMemos();
   }
 
-  // 모든 메모 로드 또는 특정 폴더의 메모 로드
-  Future<void> _loadMemos() async {
+  // 모든 메모 로드
+  Future<void> _loadAllMemos() async {
     try {
-      _memos = await DatabaseHelper.instance.getAllMemos();
+      _allMemos = await DatabaseHelper.instance.getAllMemos();
+      _memos = List<Memo>.from(_allMemos); // 초기에는 모든 메모 표시
       notifyListeners();
     } catch (e) {
       print('메모 로딩 오류: $e');
@@ -49,12 +54,15 @@ class MemoProvider with ChangeNotifier {
   // 특정 폴더의 메모 로드
   Future<void> loadMemosByFolder(String folderId) async {
     try {
+      // 전체 메모는 항상 최신 상태로 유지
+      _allMemos = await DatabaseHelper.instance.getAllMemos();
+      
       if (folderId.isEmpty) {
         // 빈 폴더 ID는 모든 메모 표시
-        _memos = await DatabaseHelper.instance.getAllMemos();
+        _memos = List<Memo>.from(_allMemos);
       } else {
         // 특정 폴더의 메모만 표시
-        _memos = await DatabaseHelper.instance.getMemosByFolder(folderId);
+        _memos = _allMemos.where((memo) => memo.folderId == folderId).toList();
       }
       notifyListeners();
     } catch (e) {
@@ -62,10 +70,28 @@ class MemoProvider with ChangeNotifier {
     }
   }
 
+  // 특정 폴더의 메모 개수 반환
+  int getMemoCountByFolder(String folderId) {
+    if (folderId.isEmpty) {
+      return _allMemos.length; // 전체 메모 개수
+    }
+    return _allMemos.where((memo) => memo.folderId == folderId).length;
+  }
+
   Future<void> addMemo(Memo memo) async {
     try {
       await DatabaseHelper.instance.insertMemo(memo);
-      _memos.insert(0, memo); // 로컬 상태 바로 업데이트
+      
+      // 전체 메모 목록과 현재 표시 목록 모두 업데이트
+      _allMemos.insert(0, memo);
+      
+      // 현재 같은 폴더를 보고 있거나 전체 메모를 보고 있는 경우에만 추가
+      if (memo.folderId == '' || _memos.isEmpty || 
+          (_memos.isNotEmpty && _memos[0].folderId == memo.folderId) || 
+          memo.folderId.isEmpty) {
+        _memos.insert(0, memo);
+      }
+      
       notifyListeners();
     } catch (e) {
       print('메모 추가 오류: $e');
@@ -76,7 +102,13 @@ class MemoProvider with ChangeNotifier {
     try {
       await DatabaseHelper.instance.updateMemo(memo);
       
-      // 메모리 내에서도 업데이트
+      // 전체 메모 목록 업데이트
+      final allIndex = _allMemos.indexWhere((m) => m.id == memo.id);
+      if (allIndex != -1) {
+        _allMemos[allIndex] = memo;
+      }
+      
+      // 현재 표시 목록 업데이트
       final index = _memos.indexWhere((m) => m.id == memo.id);
       if (index != -1) {
         _memos[index] = memo;
@@ -92,7 +124,10 @@ class MemoProvider with ChangeNotifier {
     try {
       await DatabaseHelper.instance.deleteMemo(id);
       
-      // 메모리 내에서도 삭제
+      // 전체 메모 목록에서 삭제
+      _allMemos.removeWhere((memo) => memo.id == id);
+      
+      // 현재 표시 목록에서 삭제
       _memos.removeWhere((memo) => memo.id == id);
       
       notifyListeners();
@@ -108,7 +143,10 @@ class MemoProvider with ChangeNotifier {
         await DatabaseHelper.instance.deleteMemo(id);
       }
       
-      // 메모리 내에서도 삭제
+      // 전체 메모 목록에서 삭제
+      _allMemos.removeWhere((memo) => ids.contains(memo.id));
+      
+      // 현재 표시 목록에서 삭제
       _memos.removeWhere((memo) => ids.contains(memo.id));
       
       notifyListeners();
