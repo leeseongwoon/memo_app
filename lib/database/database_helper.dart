@@ -240,10 +240,9 @@ class DatabaseHelper {
       
       // 트랜잭션 시작
       return await db.transaction((txn) async {
-        // 1. 해당 폴더의 메모들을 기본 폴더로 이동
-        await txn.update(
+        // 1. 해당 폴더의 메모들을 삭제
+        await txn.delete(
           'memos',
-          {'folderId': ''},
           where: 'folderId = ?',
           whereArgs: [id],
         );

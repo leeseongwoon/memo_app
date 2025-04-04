@@ -18,19 +18,69 @@ class MemoListScreen extends StatefulWidget {
 class _MemoListScreenState extends State<MemoListScreen> {
   String _searchQuery = '';
   bool _isSearching = false;
-  late KoreanTextEditingController _searchController;
+  late TextEditingController _searchController;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  // 다중 선택 모드 변수
+  bool _isSelectionMode = false;
+  final Set<String> _selectedMemoIds = {};
 
   @override
   void initState() {
     super.initState();
-    _searchController = KoreanTextEditingController();
+    _searchController = TextEditingController();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // 선택 모드 토글
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedMemoIds.clear();
+      }
+    });
+  }
+
+  // 메모 선택/선택 해제
+  void _toggleMemoSelection(String memoId) {
+    setState(() {
+      if (_selectedMemoIds.contains(memoId)) {
+        _selectedMemoIds.remove(memoId);
+      } else {
+        _selectedMemoIds.add(memoId);
+      }
+      
+      // 모든 선택이 해제되면 선택 모드 종료
+      if (_selectedMemoIds.isEmpty && _isSelectionMode) {
+        _isSelectionMode = false;
+      }
+    });
+  }
+
+  // 선택된 메모 삭제
+  Future<void> _deleteSelectedMemos() async {
+    if (_selectedMemoIds.isEmpty) return;
+    
+    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
+    await memoProvider.deleteMemos(_selectedMemoIds.toList());
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${_selectedMemoIds.length}개의 메모가 삭제되었습니다'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    
+    setState(() {
+      _isSelectionMode = false;
+      _selectedMemoIds.clear();
+    });
   }
 
   List<Memo> _getFilteredMemos(List<Memo> memos) {
@@ -79,7 +129,11 @@ class _MemoListScreenState extends State<MemoListScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.grey[50],
-      appBar: _isSearching ? _buildSearchAppBar() : _buildNormalAppBar(),
+      appBar: _isSearching 
+        ? _buildSearchAppBar() 
+        : (_isSelectionMode 
+          ? _buildSelectionAppBar() 
+          : _buildNormalAppBar()),
       drawer: Drawer(
         child: FolderList(
           onFolderSelected: () {
@@ -193,14 +247,50 @@ class _MemoListScreenState extends State<MemoListScreen> {
               crossAxisSpacing: 8,
               itemCount: filteredMemos.length,
               itemBuilder: (context, index) {
+                final memo = filteredMemos[index];
                 return AnimatedContainer(
                   duration: Duration(milliseconds: 300 + (index * 30)),
                   curve: Curves.easeInOut, 
                   transform: Matrix4.translationValues(0, index < 10 ? (1 - index / 10) * 20 : 0, 0),
-                  child: MemoCard(
-                    memo: filteredMemos[index],
-                    memoProvider: memoProvider,
-                    onLongPress: () => _showMemoOptions(context, filteredMemos[index]),
+                  child: Stack(
+                    children: [
+                      MemoCard(
+                        memo: memo,
+                        memoProvider: memoProvider,
+                        onLongPress: _isSelectionMode 
+                          ? null 
+                          : () => _showMemoOptions(context, memo),
+                        onTap: _isSelectionMode
+                          ? () => _toggleMemoSelection(memo.id)
+                          : null,
+                      ),
+                      if (_isSelectionMode)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: _selectedMemoIds.contains(memo.id)
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.white,
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 2,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: _selectedMemoIds.contains(memo.id)
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : null,
+                          ),
+                        ),
+                    ],
                   ),
                 );
               },
@@ -208,15 +298,18 @@ class _MemoListScreenState extends State<MemoListScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _createNewMemo(context),
-        child: const Icon(Icons.add_rounded, size: 28),
-      ),
+      floatingActionButton: _isSelectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _createNewMemo(context),
+              child: const Icon(Icons.add_rounded, size: 28),
+            ),
     );
   }
 
   AppBar _buildNormalAppBar() {
     final folderProvider = Provider.of<FolderProvider>(context);
+    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
     
     return AppBar(
       title: Text(folderProvider.currentFolderName),
@@ -228,8 +321,37 @@ class _MemoListScreenState extends State<MemoListScreen> {
       ),
       actions: [
         IconButton(
+          icon: const Icon(Icons.sort),
+          onPressed: () => _showSortOptions(context),
+        ),
+        IconButton(
           icon: const Icon(Icons.search_rounded),
           onPressed: _startSearch,
+        ),
+        IconButton(
+          icon: const Icon(Icons.check_box_outlined),
+          onPressed: _toggleSelectionMode,
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  AppBar _buildSelectionAppBar() {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _toggleSelectionMode,
+      ),
+      title: Text('${_selectedMemoIds.length}개 선택됨'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.folder_outlined),
+          onPressed: _selectedMemoIds.isNotEmpty ? () => _showMoveSelectedMemosDialog() : null,
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: _deleteSelectedMemos,
         ),
         const SizedBox(width: 8),
       ],
@@ -369,6 +491,152 @@ class _MemoListScreenState extends State<MemoListScreen> {
                   .toList(),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 여러 메모 폴더 이동
+  void _showMoveSelectedMemosDialog() {
+    if (_selectedMemoIds.isEmpty) return;
+    
+    final folderProvider = Provider.of<FolderProvider>(context, listen: false);
+    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
+    final folders = folderProvider.folders;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('폴더 이동'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.folder_outlined, color: Colors.amber),
+                title: const Text('전체 메모'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  
+                  // 선택된 모든 메모를 대상 폴더로 이동
+                  for (final memoId in _selectedMemoIds) {
+                    await memoProvider.moveMemoToFolder(memoId, '');
+                  }
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${_selectedMemoIds.length}개의 메모가 이동되었습니다'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                  
+                  // 현재 폴더의 메모 목록 갱신
+                  await memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
+                  
+                  // 선택 모드 종료
+                  setState(() {
+                    _isSelectionMode = false;
+                    _selectedMemoIds.clear();
+                  });
+                },
+              ),
+              ...folders
+                  .where((folder) => folder.name != '전체 메모')
+                  .map((folder) => ListTile(
+                        leading: const Icon(Icons.folder_outlined, color: Colors.amber),
+                        title: Text(folder.name),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          
+                          // 선택된 모든 메모를 대상 폴더로 이동
+                          for (final memoId in _selectedMemoIds) {
+                            await memoProvider.moveMemoToFolder(memoId, folder.id);
+                          }
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${_selectedMemoIds.length}개의 메모가 이동되었습니다'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                          
+                          // 현재 폴더의 메모 목록 갱신
+                          await memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
+                          
+                          // 선택 모드 종료
+                          setState(() {
+                            _isSelectionMode = false;
+                            _selectedMemoIds.clear();
+                          });
+                        },
+                      ))
+                  .toList(),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 정렬 옵션 메뉴 다이얼로그
+  void _showSortOptions(BuildContext context) {
+    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
+    final currentMemoSort = memoProvider.currentSortType;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('메모 정렬'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<MemoSort>(
+              title: const Text('최신순'),
+              value: MemoSort.latest,
+              groupValue: currentMemoSort,
+              onChanged: (value) {
+                Navigator.pop(context);
+                if (value != null) {
+                  memoProvider.changeSortType(value);
+                }
+              },
+            ),
+            RadioListTile<MemoSort>(
+              title: const Text('오래된순'),
+              value: MemoSort.oldest,
+              groupValue: currentMemoSort,
+              onChanged: (value) {
+                Navigator.pop(context);
+                if (value != null) {
+                  memoProvider.changeSortType(value);
+                }
+              },
+            ),
+            RadioListTile<MemoSort>(
+              title: const Text('이름순'),
+              value: MemoSort.nameAscending,
+              groupValue: currentMemoSort,
+              onChanged: (value) {
+                Navigator.pop(context);
+                if (value != null) {
+                  memoProvider.changeSortType(value);
+                }
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(

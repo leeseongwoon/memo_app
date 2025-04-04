@@ -11,18 +11,20 @@ class MemoCard extends StatelessWidget {
   final Memo memo;
   final MemoProvider memoProvider;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   const MemoCard({
     super.key,
     required this.memo,
     required this.memoProvider,
     this.onLongPress,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
+      onTap: onTap ?? () {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -49,6 +51,7 @@ class MemoCard extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (memo.title.isNotEmpty)
                 Text(
@@ -61,17 +64,17 @@ class MemoCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              if (memo.title.isNotEmpty) const SizedBox(height: 8),
+              if (memo.title.isNotEmpty) const SizedBox(height: 4),
               Text(
                 memo.content,
                 style: const TextStyle(
                   fontSize: 16,
                   height: 1.5,
                 ),
-                maxLines: 6,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

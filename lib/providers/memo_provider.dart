@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 import '../models/memo.dart';
 import '../database/database_helper.dart';
 
+enum MemoSort {
+  latest, // 최신순
+  oldest, // 오래된순
+  nameAscending, // 이름순 (가나다순)
+}
+
 class MemoProvider with ChangeNotifier {
   List<Memo> _memos = [];
+  MemoSort _sortType = MemoSort.latest; // 기본 정렬: 최신순
   final List<Color> memoColors = [
     const Color(0xFFF9FBE7), // 연한 라임
     const Color(0xFFFFEBEE), // 연한 분홍
@@ -17,7 +24,13 @@ class MemoProvider with ChangeNotifier {
     const Color(0xFFF1F8E9), // 연한 연두
   ];
 
-  List<Memo> get memos => _memos;
+  List<Memo> get memos {
+    final sortedMemos = List<Memo>.from(_memos);
+    _sortMemos(sortedMemos);
+    return sortedMemos;
+  }
+
+  MemoSort get currentSortType => _sortType;
 
   MemoProvider() {
     _loadMemos();
@@ -88,6 +101,22 @@ class MemoProvider with ChangeNotifier {
     }
   }
 
+  // 여러 메모 한 번에 삭제
+  Future<void> deleteMemos(List<String> ids) async {
+    try {
+      for (final id in ids) {
+        await DatabaseHelper.instance.deleteMemo(id);
+      }
+      
+      // 메모리 내에서도 삭제
+      _memos.removeWhere((memo) => ids.contains(memo.id));
+      
+      notifyListeners();
+    } catch (e) {
+      print('다중 메모 삭제 오류: $e');
+    }
+  }
+
   Future<Memo?> getMemoById(String id) async {
     if (id.isEmpty) return null;
     
@@ -114,5 +143,38 @@ class MemoProvider with ChangeNotifier {
 
   Color getColorForMemo(int colorIndex) {
     return memoColors[colorIndex % memoColors.length];
+  }
+
+  // 정렬 방식 변경
+  void changeSortType(MemoSort sortType) {
+    if (_sortType != sortType) {
+      _sortType = sortType;
+      notifyListeners();
+    }
+  }
+
+  // 메모 정렬 적용
+  void _sortMemos(List<Memo> memoList) {
+    switch (_sortType) {
+      case MemoSort.latest:
+        memoList.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
+        break;
+      case MemoSort.oldest:
+        memoList.sort((a, b) => a.modifiedAt.compareTo(b.modifiedAt));
+        break;
+      case MemoSort.nameAscending:
+        memoList.sort((a, b) {
+          if (a.title.isEmpty && b.title.isEmpty) {
+            return a.content.compareTo(b.content);
+          } else if (a.title.isEmpty) {
+            return a.content.compareTo(b.title);
+          } else if (b.title.isEmpty) {
+            return a.title.compareTo(b.content);
+          } else {
+            return a.title.compareTo(b.title);
+          }
+        });
+        break;
+    }
   }
 } 

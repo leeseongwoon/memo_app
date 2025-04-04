@@ -39,15 +39,30 @@ class FolderList extends StatelessWidget {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.add,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    onPressed: () => _showAddFolderDialog(context),
-                    iconSize: 20,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.sort,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onPressed: () => _showFolderSortOptions(context, folderProvider),
+                        iconSize: 20,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          Icons.add,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onPressed: () => _showAddFolderDialog(context),
+                        iconSize: 20,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -209,7 +224,7 @@ class FolderList extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('폴더 삭제'),
-        content: Text('${folder.name} 폴더를 삭제하시겠습니까?\n폴더 내 메모는 전체 메모로 이동됩니다.'),
+        content: Text('${folder.name} 폴더를 삭제하시겠습니까?\n폴더 내 모든 메모도 함께 삭제됩니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -222,6 +237,62 @@ class FolderList extends StatelessWidget {
               Navigator.pop(context);
             },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 폴더 정렬 옵션 다이얼로그
+  void _showFolderSortOptions(BuildContext context, FolderProvider folderProvider) {
+    final currentFolderSort = folderProvider.currentSortType;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('폴더 정렬'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<FolderSort>(
+              title: const Text('최신순'),
+              value: FolderSort.latest,
+              groupValue: currentFolderSort,
+              onChanged: (value) {
+                Navigator.pop(context);
+                if (value != null) {
+                  folderProvider.changeSortType(value);
+                }
+              },
+            ),
+            RadioListTile<FolderSort>(
+              title: const Text('오래된순'),
+              value: FolderSort.oldest,
+              groupValue: currentFolderSort,
+              onChanged: (value) {
+                Navigator.pop(context);
+                if (value != null) {
+                  folderProvider.changeSortType(value);
+                }
+              },
+            ),
+            RadioListTile<FolderSort>(
+              title: const Text('이름순'),
+              value: FolderSort.nameAscending,
+              groupValue: currentFolderSort,
+              onChanged: (value) {
+                Navigator.pop(context);
+                if (value != null) {
+                  folderProvider.changeSortType(value);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
           ),
         ],
       ),
