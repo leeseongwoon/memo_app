@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/drawing.dart';
+import 'package:provider/provider.dart';
+import '../providers/drawing_provider.dart';
 
 class DrawingScreen extends StatefulWidget {
   final String memoId;
@@ -71,13 +73,15 @@ class _DrawingScreenState extends State<DrawingScreen> {
                   onPanStart: (details) => _onPanStart(details, constraints),
                   onPanUpdate: (details) => _onPanUpdate(details, constraints),
                   onPanEnd: _onPanEnd,
-                  child: CustomPaint(
-                    painter: DrawingPainter(
-                      lines: _lines,
-                      currentLine: _currentLine,
-                      isEraser: _isEraser,
+                  child: ClipRect(
+                    child: CustomPaint(
+                      painter: DrawingPainter(
+                        lines: _lines,
+                        currentLine: _currentLine,
+                        isEraser: _isEraser,
+                      ),
+                      size: Size(constraints.maxWidth, constraints.maxHeight),
                     ),
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
                   ),
                 );
               },
@@ -206,119 +210,114 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }).toList();
   }
   
-  // 터치 시작 이벤트
-  void _onPanStart(DragStartDetails details, BoxConstraints constraints) {
-    final box = context.findRenderObject() as RenderBox;
-    final offset = box.globalToLocal(details.globalPosition);
-    final appBarHeight = MediaQuery.of(context).padding.top + kToolbarHeight;
-    
-    // AppBar 높이를 고려한 Y 좌표 조정
-    final adjustedOffset = Offset(
-      offset.dx,
-      offset.dy - appBarHeight,
+  // 오프셋 조정 메서드
+  Offset _getAdjustedOffset(Offset localPosition, BoxConstraints constraints) {
+    // 로컬 좌표를 그대로 사용하고 범위만 제한
+    return Offset(
+      localPosition.dx.clamp(0, constraints.maxWidth),
+      localPosition.dy.clamp(0, constraints.maxHeight),
     );
-    
+  }
+
+  // 그림 그리기 관련 메서드들
+  void _onPanStart(DragStartDetails details, BoxConstraints constraints) {
+    final adjustedOffset = _getAdjustedOffset(details.localPosition, constraints);
     setState(() {
       _currentLine = [
         DrawingPoint(
-          offset: adjustedOffset,
-          paint: Paint()
-            ..color = _isEraser ? Colors.white : _selectedColor
-            ..strokeWidth = _isEraser ? _eraserWidth : _selectedWidth
-            ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round
-            ..style = PaintingStyle.stroke
-            ..blendMode = BlendMode.srcOver,
+          dx: adjustedOffset.dx,
+          dy: adjustedOffset.dy,
+          strokeWidth: _isEraser ? _eraserWidth : _selectedWidth,
+          color: _isEraser ? Colors.white.value : _selectedColor.value,
         ),
       ];
     });
   }
-  
-  // 터치 이동 이벤트
+
   void _onPanUpdate(DragUpdateDetails details, BoxConstraints constraints) {
     if (_currentLine == null) return;
     
-    final box = context.findRenderObject() as RenderBox;
-    final offset = box.globalToLocal(details.globalPosition);
-    final appBarHeight = MediaQuery.of(context).padding.top + kToolbarHeight;
-    
-    // AppBar 높이를 고려한 Y 좌표 조정
-    final adjustedOffset = Offset(
-      offset.dx,
-      offset.dy - appBarHeight,
-    );
-    
+    final adjustedOffset = _getAdjustedOffset(details.localPosition, constraints);
     setState(() {
       _currentLine!.add(
         DrawingPoint(
-          offset: adjustedOffset,
-          paint: Paint()
-            ..color = _isEraser ? Colors.white : _selectedColor
-            ..strokeWidth = _isEraser ? _eraserWidth : _selectedWidth
-            ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round
-            ..style = PaintingStyle.stroke
-            ..blendMode = BlendMode.srcOver,
+          dx: adjustedOffset.dx,
+          dy: adjustedOffset.dy,
+          strokeWidth: _isEraser ? _eraserWidth : _selectedWidth,
+          color: _isEraser ? Colors.white.value : _selectedColor.value,
         ),
       );
     });
   }
-  
-  // 터치 종료 이벤트
+
   void _onPanEnd(DragEndDetails details) {
-    if (_currentLine == null) return;
-    
-    setState(() {
-      _lines.add(_currentLine!);
-      _currentLine = null;
-    });
+    if (_currentLine != null && _currentLine!.isNotEmpty) {
+      setState(() {
+        _lines.add(_currentLine!);
+        _currentLine = [];
+      });
+      
+      // 그림 저장
+      final drawing = Drawing(
+        id: widget.initialDrawing?.id ?? const Uuid().v4(),
+        memoId: widget.memoId,
+        lines: _lines,
+        createdAt: widget.initialDrawing?.createdAt ?? DateTime.now(),
+        modifiedAt: DateTime.now(),
+      );
+      context.read<DrawingProvider>().saveDrawing(drawing);
+    }
   }
   
   // 그림 저장
-  void _saveDrawing() {
-    // 여기서는 그림 데이터를 반환만 합니다.
-    // 실제 구현 시에는 DB에 저장하는 로직이 필요합니다.
+  Future<void> _saveDrawing() async {
     final drawing = Drawing(
       id: widget.initialDrawing?.id ?? const Uuid().v4(),
       memoId: widget.memoId,
-      lines: _lines,
+      lines: [..._lines],
       createdAt: widget.initialDrawing?.createdAt ?? DateTime.now(),
       modifiedAt: DateTime.now(),
     );
     
-    Navigator.pop(context, drawing);
+    await Provider.of<DrawingProvider>(context, listen: false)
+        .saveDrawing(drawing);
+    
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
   
-  // 그림 삭제 확인 대화상자
-  void _showDeleteConfirmDialog() {
-    showDialog(
+  // 그림 삭제 확인 다이얼로그
+  Future<void> _showDeleteConfirmDialog() async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('그림 삭제'),
         content: const Text('이 그림을 삭제하시겠습니까?'),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.of(context).pop(false),
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteDrawing();
-            },
-            child: const Text('삭제'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              '삭제',
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
-  }
-  
-  // 그림 삭제
-  void _deleteDrawing() {
-    // 그림 삭제 후 화면 닫기 (null 반환)
-    Navigator.pop(context, null);
+    
+    if (confirmed == true) {
+      await Provider.of<DrawingProvider>(context, listen: false)
+          .deleteDrawing(widget.memoId);
+      
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 }
 
@@ -331,76 +330,52 @@ class DrawingPainter extends CustomPainter {
   DrawingPainter({
     required this.lines,
     this.currentLine,
-    this.isEraser = false,
+    required this.isEraser,
   });
   
   @override
   void paint(Canvas canvas, Size size) {
-    // 배경은 흰색으로
+    // 배경을 흰색으로 채우기
     canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
+      Offset.zero & size,
       Paint()..color = Colors.white,
     );
     
     // 완성된 선들 그리기
     for (final line in lines) {
-      if (line.length < 2) continue;
-      
-      for (int i = 0; i < line.length - 1; i++) {
-        final point1 = line[i];
-        final point2 = line[i + 1];
-        
-        if (isEraser) {
-          // 지우개일 경우 원형으로 지우기
-          final path = Path()
-            ..moveTo(point1.offset.dx, point1.offset.dy)
-            ..lineTo(point2.offset.dx, point2.offset.dy);
-          
-          canvas.drawPath(
-            path,
-            point1.paint..strokeCap = StrokeCap.round,
-          );
-        } else {
-          canvas.drawLine(
-            point1.offset,
-            point2.offset,
-            point1.paint,
-          );
-        }
-      }
+      _drawLine(canvas, line);
     }
     
     // 현재 그리고 있는 선 그리기
-    if (currentLine != null && currentLine!.length >= 2) {
-      for (int i = 0; i < currentLine!.length - 1; i++) {
-        final point1 = currentLine![i];
-        final point2 = currentLine![i + 1];
-        
-        if (isEraser) {
-          // 지우개일 경우 원형으로 지우기
-          final path = Path()
-            ..moveTo(point1.offset.dx, point1.offset.dy)
-            ..lineTo(point2.offset.dx, point2.offset.dy);
-          
-          canvas.drawPath(
-            path,
-            point1.paint..strokeCap = StrokeCap.round,
-          );
-        } else {
-          canvas.drawLine(
-            point1.offset,
-            point2.offset,
-            point1.paint,
-          );
-        }
-      }
+    if (currentLine != null) {
+      _drawLine(canvas, currentLine!);
+    }
+  }
+  
+  void _drawLine(Canvas canvas, List<DrawingPoint> points) {
+    if (points.isEmpty) return;
+    
+    for (int i = 0; i < points.length - 1; i++) {
+      final point1 = points[i];
+      final point2 = points[i + 1];
+      
+      final paint = Paint()
+        ..color = Color(point1.color)
+        ..strokeWidth = point1.strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+      
+      canvas.drawLine(
+        Offset(point1.dx, point1.dy),
+        Offset(point2.dx, point2.dy),
+        paint,
+      );
     }
   }
   
   @override
-  bool shouldRepaint(DrawingPainter oldDelegate) {
-    return oldDelegate.lines != lines || 
-           oldDelegate.currentLine != currentLine ||
-           oldDelegate.isEraser != isEraser;
+  bool shouldRepaint(covariant DrawingPainter oldDelegate) {
+    return true;
   }
 } 

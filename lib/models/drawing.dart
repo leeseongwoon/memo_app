@@ -1,20 +1,55 @@
 import 'dart:ui';
+import 'package:hive/hive.dart';
 
+part 'drawing.g.dart';
+
+@HiveType(typeId: 2)
 class DrawingPoint {
-  final Offset offset;
-  final Paint paint;
+  @HiveField(0)
+  final double dx;
+  
+  @HiveField(1)
+  final double dy;
+  
+  @HiveField(2)
+  final double strokeWidth;
+  
+  @HiveField(3)
+  final int color;
   
   DrawingPoint({
-    required this.offset,
-    required this.paint,
+    required this.dx,
+    required this.dy,
+    required this.strokeWidth,
+    required this.color,
   });
+  
+  Offset get offset => Offset(dx, dy);
+  
+  Paint get paint {
+    return Paint()
+      ..color = Color(color)
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+  }
 }
 
-class Drawing {
+@HiveType(typeId: 3)
+class Drawing extends HiveObject {
+  @HiveField(0)
   final String id;
+  
+  @HiveField(1)
   final String memoId;
+  
+  @HiveField(2)
   final List<List<DrawingPoint>> lines;
+  
+  @HiveField(3)
   final DateTime createdAt;
+  
+  @HiveField(4)
   final DateTime modifiedAt;
   
   Drawing({
@@ -42,8 +77,6 @@ class Drawing {
   }
   
   Map<String, dynamic> toMap() {
-    // 실제 구현 시에는 Offset과 Paint 객체를 저장 가능한 형태로 변환해야 합니다
-    // 여기서는 개념적인 코드만 작성합니다
     return {
       'id': id,
       'memoId': memoId,

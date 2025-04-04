@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/folder.dart';
-import '../database/database_helper.dart';
 
 enum FolderSort {
   latest, // 최신순
@@ -9,6 +9,7 @@ enum FolderSort {
 }
 
 class FolderProvider with ChangeNotifier {
+  late Box<Folder> _folderBox;
   List<Folder> _folders = [];
   String _currentFolderId = '';
   FolderSort _sortType = FolderSort.nameAscending; // 기본 정렬: 이름순
@@ -70,49 +71,38 @@ class FolderProvider with ChangeNotifier {
   }
 
   FolderProvider() {
-    _loadFolders();
+    _initHive();
+  }
+
+  Future<void> _initHive() async {
+    _folderBox = await Hive.openBox<Folder>('folders');
+    await _loadFolders();
   }
 
   Future<void> _loadFolders() async {
-    try {
-      _folders = await DatabaseHelper.instance.getAllFolders();
-      notifyListeners();
-    } catch (e) {
-      print('폴더 로딩 오류: $e');
-    }
+    _folders = _folderBox.values.toList();
+    notifyListeners();
   }
 
   Future<void> addFolder(String name) async {
-    try {
-      final folder = Folder(name: name);
-      await DatabaseHelper.instance.insertFolder(folder);
-      await _loadFolders();
-    } catch (e) {
-      print('폴더 추가 오류: $e');
-    }
+    final folder = Folder(name: name);
+    await _folderBox.put(folder.id, folder);
+    await _loadFolders();
   }
 
   Future<void> updateFolder(Folder folder) async {
-    try {
-      await DatabaseHelper.instance.updateFolder(folder);
-      await _loadFolders();
-    } catch (e) {
-      print('폴더 업데이트 오류: $e');
-    }
+    await _folderBox.put(folder.id, folder);
+    await _loadFolders();
   }
 
   Future<void> deleteFolder(String id) async {
-    try {
-      await DatabaseHelper.instance.deleteFolder(id);
-      
-      // 현재 선택된 폴더가 삭제되는 경우 기본 폴더로 변경
-      if (_currentFolderId == id) {
-        _currentFolderId = '';
-      }
-      
-      await _loadFolders();
-    } catch (e) {
-      print('폴더 삭제 오류: $e');
+    await _folderBox.delete(id);
+    
+    // 현재 선택된 폴더가 삭제되는 경우 기본 폴더로 변경
+    if (_currentFolderId == id) {
+      _currentFolderId = '';
     }
+    
+    await _loadFolders();
   }
 } 

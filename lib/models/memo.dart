@@ -1,12 +1,29 @@
 import 'package:uuid/uuid.dart';
+import 'package:hive/hive.dart';
 
-class Memo {
+part 'memo.g.dart';
+
+@HiveType(typeId: 0)
+class Memo extends HiveObject {
+  @HiveField(0)
   final String id;
+
+  @HiveField(1)
   String title;
+
+  @HiveField(2)
   String content;
+
+  @HiveField(3)
   DateTime createdAt;
+
+  @HiveField(4)
   DateTime modifiedAt;
+
+  @HiveField(5)
   int colorIndex;
+
+  @HiveField(6)
   String folderId;
 
   Memo({

@@ -5,6 +5,7 @@ import '../models/drawing.dart';
 import '../providers/memo_provider.dart';
 import '../providers/drawing_provider.dart';
 import '../utils/date_formatter.dart';
+import '../painters/drawing_preview_painter.dart';
 import 'drawing_screen.dart';
 
 // 한글 입력을 위한 특수 컨트롤러
@@ -313,11 +314,35 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey.withOpacity(0.3)),
                         ),
-                        child: Center(
-                          child: _drawing!.lines.isEmpty
-                              ? const Text('그림이 비어 있습니다')
-                              : const Text('그림 보기 (탭하여 편집)'),
-                        ),
+                        child: _drawing!.lines.isEmpty
+                            ? const Center(child: Text('그림이 비어 있습니다'))
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Stack(
+                                  children: [
+                                    CustomPaint(
+                                      painter: DrawingPreviewPainter(_drawing!.lines),
+                                      size: const Size(double.infinity, 150),
+                                    ),
+                                    // 반투명한 오버레이
+                                    Positioned.fill(
+                                      child: Container(
+                                        color: Colors.black.withOpacity(0.05),
+                                        child: const Center(
+                                          child: Text(
+                                            '탭하여 편집',
+                                            style: TextStyle(
+                                              color: Colors.black54,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                       ),
                     ),
                 ],

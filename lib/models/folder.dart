@@ -1,8 +1,17 @@
 import 'package:uuid/uuid.dart';
+import 'package:hive/hive.dart';
 
-class Folder {
+part 'folder.g.dart';
+
+@HiveType(typeId: 1)
+class Folder extends HiveObject {
+  @HiveField(0)
   final String id;
+
+  @HiveField(1)
   String name;
+
+  @HiveField(2)
   DateTime createdAt;
 
   Folder({
