@@ -328,16 +328,16 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
                                     Positioned.fill(
                                       child: Container(
                                         color: Colors.black.withOpacity(0.05),
-                                        child: const Center(
-                                          child: Text(
-                                            '탭하여 편집',
-                                            style: TextStyle(
-                                              color: Colors.black54,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
+                                        // child: const Center(
+                                        //   child: Text(
+                                        //     '탭하여 편집',
+                                        //     style: TextStyle(
+                                        //       color: Colors.black54,
+                                        //       fontSize: 14,
+                                        //       fontWeight: FontWeight.w500,
+                                        //     ),
+                                        //   ),
+                                        // ),
                                       ),
                                     ),
                                   ],
