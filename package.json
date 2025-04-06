@@ -1,0 +1,11 @@
+{
+  "name": "memo-app",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "flutter build web && node scripts/inject-env.js",
+    "deploy": "npm run build && firebase deploy --only hosting"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+} 
