@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/memo.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum MemoSort {
   latest, // 최신순
@@ -13,6 +14,7 @@ class MemoProvider with ChangeNotifier {
   List<Memo> _memos = []; // 현재 표시할 메모 목록
   List<Memo> _allMemos = []; // 전체 메모 목록 (개수 계산용)
   MemoSort _sortType = MemoSort.latest; // 기본 정렬: 최신순
+  final _memosCollection = FirebaseFirestore.instance.collection('memos');
   final List<Color> memoColors = [
     const Color(0xFFF9FBE7), // 연한 라임
     const Color(0xFFFFEBEE), // 연한 분홍
@@ -48,14 +50,14 @@ class MemoProvider with ChangeNotifier {
 
   // 모든 메모 로드
   Future<void> _loadAllMemos() async {
-    _allMemos = _memoBox.values.toList();
+    _allMemos = _memoBox.toMap().values.toList();
     _memos = List<Memo>.from(_allMemos); // 초기에는 모든 메모 표시
     notifyListeners();
   }
 
   // 특정 폴더의 메모 로드
   Future<void> loadMemosByFolder(String folderId) async {
-    _allMemos = _memoBox.values.toList();
+    _allMemos = _memoBox.toMap().values.toList();
     
     if (folderId.isEmpty) {
       // 빈 폴더 ID는 모든 메모 표시
@@ -76,64 +78,158 @@ class MemoProvider with ChangeNotifier {
   }
 
   Future<void> addMemo(Memo memo) async {
-    await _memoBox.put(memo.id, memo);
-    
-    // 전체 메모 목록과 현재 표시 목록 모두 업데이트
-    _allMemos.insert(0, memo);
-    
-    // 현재 같은 폴더를 보고 있거나 전체 메모를 보고 있는 경우에만 추가
-    if (memo.folderId == '' || _memos.isEmpty || 
-        (_memos.isNotEmpty && _memos[0].folderId == memo.folderId) || 
-        memo.folderId.isEmpty) {
-      _memos.insert(0, memo);
+    try {
+      // Hive에 저장
+      await _memoBox.put(memo.id, memo);
+      
+      // 전체 메모 목록과 현재 표시 목록 모두 업데이트
+      _allMemos.insert(0, memo);
+      
+      // 현재 같은 폴더를 보고 있거나 전체 메모를 보고 있는 경우에만 추가
+      if (memo.folderId == '' || _memos.isEmpty || 
+          (_memos.isNotEmpty && _memos[0].folderId == memo.folderId) || 
+          memo.folderId.isEmpty) {
+        _memos.insert(0, memo);
+      }
+      
+      // UI 업데이트
+      notifyListeners();
+      
+      // Firebase에 저장 시도 (비동기적으로 처리)
+      _saveToFirestore(memo).catchError((e) {
+        print('Firebase에 메모 저장 오류 (무시됨): $e');
+      });
+    } catch (e) {
+      print('메모 저장 오류: $e');
+      // 오류가 발생해도 UI는 갱신
+      notifyListeners();
     }
-    
-    notifyListeners();
+  }
+  
+  // Firestore에 메모 저장하는 별도 메서드
+  Future<void> _saveToFirestore(Memo memo) async {
+    try {
+      final memoData = {
+        'id': memo.id,
+        'title': memo.title,
+        'content': memo.content,
+        'colorIndex': memo.colorIndex,
+        'folderId': memo.folderId,
+        'createdAt': Timestamp.fromDate(memo.createdAt),
+        'modifiedAt': Timestamp.fromDate(memo.modifiedAt),
+      };
+      
+      await _memosCollection.doc(memo.id).set(memoData);
+    } catch (e) {
+      print('Firebase에 메모 저장 오류: $e');
+    }
   }
 
   Future<void> updateMemo(Memo memo) async {
-    await _memoBox.put(memo.id, memo);
-    
-    // 전체 메모 목록 업데이트
-    final allIndex = _allMemos.indexWhere((m) => m.id == memo.id);
-    if (allIndex != -1) {
-      _allMemos[allIndex] = memo;
+    try {
+      // Hive에 저장
+      await _memoBox.put(memo.id, memo);
+      
+      // 전체 메모 목록 업데이트
+      final allIndex = _allMemos.indexWhere((m) => m.id == memo.id);
+      if (allIndex != -1) {
+        _allMemos[allIndex] = memo;
+      }
+      
+      // 현재 표시 목록 업데이트
+      final index = _memos.indexWhere((m) => m.id == memo.id);
+      if (index != -1) {
+        _memos[index] = memo;
+      }
+      
+      // UI 업데이트
+      notifyListeners();
+      
+      // Firebase에 업데이트 시도 (비동기적으로 처리)
+      _updateInFirestore(memo).catchError((e) {
+        print('Firebase에 메모 업데이트 오류 (무시됨): $e');
+      });
+    } catch (e) {
+      print('메모 업데이트 오류: $e');
+      notifyListeners();
     }
-    
-    // 현재 표시 목록 업데이트
-    final index = _memos.indexWhere((m) => m.id == memo.id);
-    if (index != -1) {
-      _memos[index] = memo;
+  }
+  
+  // Firestore에 메모 업데이트하는 별도 메서드
+  Future<void> _updateInFirestore(Memo memo) async {
+    try {
+      final memoData = {
+        'title': memo.title,
+        'content': memo.content,
+        'colorIndex': memo.colorIndex,
+        'folderId': memo.folderId,
+        'modifiedAt': Timestamp.fromDate(memo.modifiedAt),
+      };
+      
+      await _memosCollection.doc(memo.id).update(memoData);
+    } catch (e) {
+      print('Firebase에 메모 업데이트 오류: $e');
     }
-    
-    notifyListeners();
   }
 
   Future<void> deleteMemo(String id) async {
-    await _memoBox.delete(id);
-    
-    // 전체 메모 목록에서 삭제
-    _allMemos.removeWhere((memo) => memo.id == id);
-    
-    // 현재 표시 목록에서 삭제
-    _memos.removeWhere((memo) => memo.id == id);
-    
-    notifyListeners();
+    try {
+      // Hive에서 삭제
+      await _memoBox.delete(id);
+      
+      // 전체 메모 목록에서 삭제
+      _allMemos.removeWhere((memo) => memo.id == id);
+      
+      // 현재 표시 목록에서 삭제
+      _memos.removeWhere((memo) => memo.id == id);
+      
+      // UI 업데이트
+      notifyListeners();
+      
+      // Firebase에서 삭제 시도 (비동기적으로 처리)
+      _deleteFromFirestore(id).catchError((e) {
+        print('Firebase에서 메모 삭제 오류 (무시됨): $e');
+      });
+    } catch (e) {
+      print('메모 삭제 오류: $e');
+      notifyListeners();
+    }
+  }
+  
+  // Firestore에서 메모 삭제하는 별도 메서드
+  Future<void> _deleteFromFirestore(String id) async {
+    try {
+      await _memosCollection.doc(id).delete();
+    } catch (e) {
+      print('Firebase에서 메모 삭제 오류: $e');
+    }
   }
 
   // 여러 메모 한 번에 삭제
   Future<void> deleteMemos(List<String> ids) async {
-    for (final id in ids) {
-      await _memoBox.delete(id);
+    try {
+      for (final id in ids) {
+        // Hive에서 삭제
+        await _memoBox.delete(id);
+        
+        // Firebase에서 삭제 시도 (비동기적으로 처리)
+        _deleteFromFirestore(id).catchError((e) {
+          print('Firebase에서 메모 삭제 오류 (무시됨): $e');
+        });
+      }
+      
+      // 전체 메모 목록에서 삭제
+      _allMemos.removeWhere((memo) => ids.contains(memo.id));
+      
+      // 현재 표시 목록에서 삭제
+      _memos.removeWhere((memo) => ids.contains(memo.id));
+      
+      // UI 업데이트
+      notifyListeners();
+    } catch (e) {
+      print('메모 일괄 삭제 오류: $e');
+      notifyListeners();
     }
-    
-    // 전체 메모 목록에서 삭제
-    _allMemos.removeWhere((memo) => ids.contains(memo.id));
-    
-    // 현재 표시 목록에서 삭제
-    _memos.removeWhere((memo) => ids.contains(memo.id));
-    
-    notifyListeners();
   }
 
   Future<Memo?> getMemoById(String id) async {

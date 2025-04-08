@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../models/drawing.dart';
 import 'package:provider/provider.dart';
 import '../providers/drawing_provider.dart';
+import '../widgets/confirm_dialog.dart';
 
 class DrawingScreen extends StatefulWidget {
   final String memoId;
@@ -45,131 +46,158 @@ class _DrawingScreenState extends State<DrawingScreen> {
   
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('그림 그리기'),
-        actions: [
-          // 그림 삭제 버튼
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: _showDeleteConfirmDialog,
-            tooltip: '그림 삭제',
+    return WillPopScope(
+      onWillPop: () async {
+        // 뒤로가기 버튼을 눌렀을 때 현재 그림을 저장하고 반환
+        if (_lines.isNotEmpty) {
+          await _saveDrawing();
+        } else if (widget.initialDrawing != null) {
+          // 기존 그림이 있고 현재 라인이 비어있어도 기존 그림을 반환
+          Navigator.of(context).pop(widget.initialDrawing);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('그림 그리기'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              // 뒤로가기 버튼을 눌렀을 때 현재 그림을 저장하고 반환
+              if (_lines.isNotEmpty) {
+                await _saveDrawing();
+              } else if (widget.initialDrawing != null) {
+                // 기존 그림이 있고 현재 라인이 비어있어도 기존 그림을 반환
+                Navigator.of(context).pop(widget.initialDrawing);
+                return;
+              }
+              Navigator.of(context).pop();
+            },
           ),
-          // 저장 버튼
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveDrawing,
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          // 그림 그리기 영역
-          Container(
-            color: Colors.white,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return GestureDetector(
-                  onPanStart: (details) => _onPanStart(details, constraints),
-                  onPanUpdate: (details) => _onPanUpdate(details, constraints),
-                  onPanEnd: _onPanEnd,
-                  child: ClipRect(
-                    child: CustomPaint(
-                      painter: DrawingPainter(
-                        lines: _lines,
-                        currentLine: _currentLine,
-                        isEraser: _isEraser,
-                      ),
-                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                    ),
-                  ),
-                );
-              },
+          actions: [
+            // 그림 삭제 버튼
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _showDeleteConfirmDialog,
+              tooltip: '그림 삭제',
             ),
-          ),
-          
-          // 하단 도구 모음
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(8.0),
-              color: Colors.white.withOpacity(0.8),
-              child: Row(
-                children: [
-                  // 색상 선택 버튼들
-                  ..._buildColorButtons(),
-                  
-                  const SizedBox(width: 16),
-                  
-                  // 선 두께 조절 슬라이더
-                  Expanded(
-                    child: Slider(
-                      value: _selectedWidth,
-                      min: 1.0,
-                      max: 10.0,
-                      divisions: 9,
-                      label: _selectedWidth.round().toString(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedWidth = value;
-                          _isEraser = false; // 두께 변경 시 지우개 모드 해제
-                        });
-                      },
-                    ),
-                  ),
-                  
-                  // 지우개 버튼
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.cleaning_services_rounded,
-                          color: _isEraser ? Colors.red : Colors.grey,
+            // 저장 버튼
+            IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: _saveDrawing,
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            // 그림 그리기 영역
+            Container(
+              color: Colors.white,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
+                    onPanStart: (details) => _onPanStart(details, constraints),
+                    onPanUpdate: (details) => _onPanUpdate(details, constraints),
+                    onPanEnd: _onPanEnd,
+                    child: ClipRect(
+                      child: CustomPaint(
+                        painter: DrawingPainter(
+                          lines: _lines,
+                          currentLine: _currentLine,
+                          isEraser: _isEraser,
                         ),
-                        tooltip: '지우개',
-                        onPressed: () {
+                        size: Size(constraints.maxWidth, constraints.maxHeight),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+            // 하단 도구 모음
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                color: Colors.white.withAlpha(204), // 0.8 * 255 = 204
+                child: Row(
+                  children: [
+                    // 색상 선택 버튼들
+                    ..._buildColorButtons(),
+                    
+                    const SizedBox(width: 16),
+                    
+                    // 선 두께 조절 슬라이더
+                    Expanded(
+                      child: Slider(
+                        value: _selectedWidth,
+                        min: 1.0,
+                        max: 10.0,
+                        divisions: 9,
+                        label: _selectedWidth.round().toString(),
+                        onChanged: (value) {
                           setState(() {
-                            _isEraser = !_isEraser;
+                            _selectedWidth = value;
+                            _isEraser = false; // 두께 변경 시 지우개 모드 해제
                           });
                         },
                       ),
-                      if (_isEraser)
-                        SizedBox(
-                          width: 100,
-                          child: Slider(
-                            value: _eraserWidth,
-                            min: 10.0,
-                            max: 50.0,
-                            divisions: 4,
-                            label: _eraserWidth.round().toString(),
-                            onChanged: (value) {
-                              setState(() {
-                                _eraserWidth = value;
-                              });
-                            },
+                    ),
+                    
+                    // 지우개 버튼
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.cleaning_services_rounded,
+                            color: _isEraser ? Colors.red : Colors.grey,
                           ),
+                          tooltip: '지우개',
+                          onPressed: () {
+                            setState(() {
+                              _isEraser = !_isEraser;
+                            });
+                          },
                         ),
-                    ],
-                  ),
-                  
-                  // 초기화 버튼
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () {
-                      setState(() {
-                        _lines = [];
-                        _currentLine = null;
-                      });
-                    },
-                  ),
-                ],
+                        if (_isEraser)
+                          SizedBox(
+                            width: 100,
+                            child: Slider(
+                              value: _eraserWidth,
+                              min: 10.0,
+                              max: 50.0,
+                              divisions: 4,
+                              label: _eraserWidth.round().toString(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _eraserWidth = value;
+                                });
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                    
+                    // 초기화 버튼
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () {
+                        setState(() {
+                          _lines = [];
+                          _currentLine = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -228,7 +256,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
           dx: adjustedOffset.dx,
           dy: adjustedOffset.dy,
           strokeWidth: _isEraser ? _eraserWidth : _selectedWidth,
-          color: _isEraser ? Colors.white.value : _selectedColor.value,
+          color: _isEraser ? Colors.white.toARGB32() : _selectedColor.toARGB32(),
         ),
       ];
     });
@@ -244,7 +272,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
           dx: adjustedOffset.dx,
           dy: adjustedOffset.dy,
           strokeWidth: _isEraser ? _eraserWidth : _selectedWidth,
-          color: _isEraser ? Colors.white.value : _selectedColor.value,
+          color: _isEraser ? Colors.white.toARGB32() : _selectedColor.toARGB32(),
         ),
       );
     });
@@ -279,43 +307,80 @@ class _DrawingScreenState extends State<DrawingScreen> {
       modifiedAt: DateTime.now(),
     );
     
-    await Provider.of<DrawingProvider>(context, listen: false)
-        .saveDrawing(drawing);
+    // 드로잉 프로바이더에 저장
+    final drawingProvider = Provider.of<DrawingProvider>(context, listen: false);
+    await drawingProvider.saveDrawing(drawing);
+    
+    // 한 번 더 상태 갱신 신호 보내기
+    drawingProvider.notifyDrawingChanged(widget.memoId);
     
     if (mounted) {
-      Navigator.of(context).pop();
+      // 결과 데이터를 반환하며 닫기
+      Navigator.of(context).pop(drawing);
     }
   }
   
   // 그림 삭제 확인 다이얼로그
   Future<void> _showDeleteConfirmDialog() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('그림 삭제'),
-        content: const Text('이 그림을 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(
-              '삭제',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+      title: '그림 삭제',
+      content: '이 그림을 삭제하시겠습니까?',
+      confirmText: '삭제',
+      isDangerous: true,
     );
     
     if (confirmed == true) {
-      await Provider.of<DrawingProvider>(context, listen: false)
-          .deleteDrawing(widget.memoId);
+      final drawingProvider = Provider.of<DrawingProvider>(context, listen: false);
+      final memoId = widget.memoId;
       
-      if (mounted) {
-        Navigator.of(context).pop();
+      try {
+        // 먼저 로컬 UI 상태 업데이트 (그림 즉시 제거)
+        setState(() {
+          _lines = [];
+          _currentLine = null;
+        });
+        
+        // 1. 현재 그림 ID 저장 (있을 경우)
+        String? drawingId;
+        final drawing = await drawingProvider.getDrawingByMemoId(memoId);
+        if (drawing != null) {
+          drawingId = drawing.id;
+        }
+        
+        // 2. 메모리 캐시에서 강제 제거
+        drawingProvider.forceClearDrawing(memoId);
+        
+        // 3. 상태 변경 즉시 알림
+        drawingProvider.notifyDrawingChanged(memoId);
+        
+        // 4. 그림 ID로 직접 삭제 (알고 있는 경우)
+        if (drawingId != null) {
+          await drawingProvider.deleteDrawingDirectly(drawingId);
+        }
+        
+        // 5. 기존 삭제 메서드 호출 (백그라운드에서 실행)
+        await drawingProvider.deleteDrawing(memoId);
+        
+        // 6. 다시 한번 알림 (지연 적용)
+        Future.delayed(const Duration(milliseconds: 100), () {
+          drawingProvider.notifyDrawingChanged(memoId);
+        });
+        
+        // 7. 화면 닫기 - null을 반환하여 그림이 삭제되었음을 알림
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('그림이 삭제되었습니다')),
+          );
+          Navigator.of(context).pop(null);
+        }
+      } catch (e) {
+        print('그림 삭제 오류: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('그림 삭제 중 오류가 발생했습니다')),
+          );
+        }
       }
     }
   }

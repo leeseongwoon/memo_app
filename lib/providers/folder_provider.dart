@@ -80,7 +80,7 @@ class FolderProvider with ChangeNotifier {
   }
 
   Future<void> _loadFolders() async {
-    _folders = _folderBox.values.toList();
+    _folders = _folderBox.toMap().values.toList();
     notifyListeners();
   }
 

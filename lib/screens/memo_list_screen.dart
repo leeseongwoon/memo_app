@@ -47,6 +47,19 @@ class _MemoListScreenState extends State<MemoListScreen> {
     });
   }
 
+  // 전체 선택/해제
+  void _toggleSelectAll() {
+    setState(() {
+      final memoProvider = Provider.of<MemoProvider>(context, listen: false);
+      if (_selectedMemoIds.length == memoProvider.memos.length) {
+        _selectedMemoIds.clear();
+      } else {
+        _selectedMemoIds.clear();
+        _selectedMemoIds.addAll(memoProvider.memos.map((memo) => memo.id));
+      }
+    });
+  }
+
   // 메모 선택/선택 해제
   void _toggleMemoSelection(String memoId) {
     setState(() {
@@ -54,11 +67,6 @@ class _MemoListScreenState extends State<MemoListScreen> {
         _selectedMemoIds.remove(memoId);
       } else {
         _selectedMemoIds.add(memoId);
-      }
-      
-      // 모든 선택이 해제되면 선택 모드 종료
-      if (_selectedMemoIds.isEmpty && _isSelectionMode) {
-        _isSelectionMode = false;
       }
     });
   }
@@ -123,9 +131,6 @@ class _MemoListScreenState extends State<MemoListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final folderProvider = Provider.of<FolderProvider>(context);
-    
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.grey[50],
@@ -168,7 +173,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
                           width: 180,
                           height: 180,
                           decoration: BoxDecoration(
-                            color: Colors.deepPurple.withOpacity(0.1),
+                            color: Colors.deepPurple.withAlpha(26),
                             borderRadius: BorderRadius.circular(90),
                           ),
                           child: Icon(
@@ -261,33 +266,44 @@ class _MemoListScreenState extends State<MemoListScreen> {
                           ? null 
                           : () => _showMemoOptions(context, memo),
                         onTap: _isSelectionMode
-                          ? () => _toggleMemoSelection(memo.id)
+                          ? () {
+                              setState(() {
+                                _toggleMemoSelection(memo.id);
+                              });
+                            }
                           : null,
                       ),
                       if (_isSelectionMode)
                         Positioned(
                           top: 8,
                           right: 8,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: _selectedMemoIds.contains(memo.id)
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.white,
-                              border: Border.all(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 2,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _toggleMemoSelection(memo.id);
+                              });
+                            },
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: _selectedMemoIds.contains(memo.id)
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.white,
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 2,
+                                ),
+                                shape: BoxShape.circle,
                               ),
-                              shape: BoxShape.circle,
+                              child: _selectedMemoIds.contains(memo.id)
+                                ? const Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: Colors.white,
+                                  )
+                                : null,
                             ),
-                            child: _selectedMemoIds.contains(memo.id)
-                              ? const Icon(
-                                  Icons.check,
-                                  size: 16,
-                                  color: Colors.white,
-                                )
-                              : null,
                           ),
                         ),
                     ],
@@ -346,6 +362,11 @@ class _MemoListScreenState extends State<MemoListScreen> {
       title: Text('${_selectedMemoIds.length}개 선택됨'),
       actions: [
         IconButton(
+          icon: const Icon(Icons.done_all_rounded, color: Colors.deepPurple),
+          onPressed: _toggleSelectAll,
+          tooltip: '전체 선택',
+        ),
+        IconButton(
           icon: const Icon(Icons.folder_outlined),
           onPressed: _selectedMemoIds.isNotEmpty ? () => _showMoveSelectedMemosDialog() : null,
         ),
@@ -401,7 +422,6 @@ class _MemoListScreenState extends State<MemoListScreen> {
   // 메모 옵션 메뉴 (폴더 이동 등)
   void _showMemoOptions(BuildContext context, Memo memo) {
     final folderProvider = Provider.of<FolderProvider>(context, listen: false);
-    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
     
     showModalBottomSheet(
       context: context,
@@ -422,7 +442,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
               title: const Text('메모 삭제', style: TextStyle(color: Colors.red)),
               onTap: () async {
                 Navigator.pop(context);
-                await memoProvider.deleteMemo(memo.id);
+                await Provider.of<MemoProvider>(context, listen: false).deleteMemo(memo.id);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('메모가 삭제되었습니다'),
@@ -439,9 +459,8 @@ class _MemoListScreenState extends State<MemoListScreen> {
 
   // 메모 폴더 이동 다이얼로그
   void _showMoveMemoDialog(BuildContext context, Memo memo) {
-    final folderProvider = Provider.of<FolderProvider>(context, listen: false);
-    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
-    final folders = folderProvider.folders;
+    final provider = Provider.of<FolderProvider>(context, listen: false);
+    final folders = provider.folders;
     
     showDialog(
       context: context,
@@ -457,7 +476,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
                 title: const Text('전체 메모'),
                 selected: memo.folderId.isEmpty,
                 onTap: () async {
-                  await memoProvider.moveMemoToFolder(memo.id, '');
+                  await Provider.of<MemoProvider>(context, listen: false).moveMemoToFolder(memo.id, '');
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -466,7 +485,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
                     ),
                   );
                   // 현재 폴더의 메모 목록 갱신
-                  memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
+                  Provider.of<MemoProvider>(context, listen: false).loadMemosByFolder(provider.currentFolderId);
                 },
               ),
               ...folders
@@ -476,7 +495,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
                         title: Text(folder.name),
                         selected: memo.folderId == folder.id,
                         onTap: () async {
-                          await memoProvider.moveMemoToFolder(memo.id, folder.id);
+                          await Provider.of<MemoProvider>(context, listen: false).moveMemoToFolder(memo.id, folder.id);
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -485,7 +504,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
                             ),
                           );
                           // 현재 폴더의 메모 목록 갱신
-                          memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
+                          Provider.of<MemoProvider>(context, listen: false).loadMemosByFolder(provider.currentFolderId);
                         },
                       ))
                   .toList(),
@@ -513,71 +532,89 @@ class _MemoListScreenState extends State<MemoListScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('폴더 이동'),
+        title: Row(
+          children: [
+            const Text('폴더 이동'),
+            const Spacer(),
+            TextButton.icon(
+              icon: const Icon(Icons.create_new_folder),
+              label: const Text('새 폴더'),
+              onPressed: () => _showAddFolderDialog(context),
+            ),
+          ],
+        ),
         content: SizedBox(
           width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.folder_outlined, color: Colors.amber),
-                title: const Text('전체 메모'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  
-                  // 선택된 모든 메모를 대상 폴더로 이동
-                  for (final memoId in _selectedMemoIds) {
-                    await memoProvider.moveMemoToFolder(memoId, '');
-                  }
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${_selectedMemoIds.length}개의 메모가 이동되었습니다'),
-                      duration: const Duration(seconds: 2),
+              // 폴더 목록
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.folder_outlined, color: Colors.amber),
+                      title: const Text('전체 메모'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        
+                        // 선택된 모든 메모를 대상 폴더로 이동
+                        for (final memoId in _selectedMemoIds) {
+                          await memoProvider.moveMemoToFolder(memoId, '');
+                        }
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${_selectedMemoIds.length}개의 메모가 이동되었습니다'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        
+                        // 현재 폴더의 메모 목록 갱신
+                        await memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
+                        
+                        // 선택 모드 종료
+                        setState(() {
+                          _isSelectionMode = false;
+                          _selectedMemoIds.clear();
+                        });
+                      },
                     ),
-                  );
-                  
-                  // 현재 폴더의 메모 목록 갱신
-                  await memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
-                  
-                  // 선택 모드 종료
-                  setState(() {
-                    _isSelectionMode = false;
-                    _selectedMemoIds.clear();
-                  });
-                },
+                    ...folders
+                        .where((folder) => folder.name != '전체 메모')
+                        .map((folder) => ListTile(
+                              leading: const Icon(Icons.folder_outlined, color: Colors.amber),
+                              title: Text(folder.name),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                
+                                // 선택된 모든 메모를 대상 폴더로 이동
+                                for (final memoId in _selectedMemoIds) {
+                                  await memoProvider.moveMemoToFolder(memoId, folder.id);
+                                }
+                                
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${_selectedMemoIds.length}개의 메모가 이동되었습니다'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                                
+                                // 현재 폴더의 메모 목록 갱신
+                                await memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
+                                
+                                // 선택 모드 종료
+                                setState(() {
+                                  _isSelectionMode = false;
+                                  _selectedMemoIds.clear();
+                                });
+                              },
+                            ))
+                        .toList(),
+                  ],
+                ),
               ),
-              ...folders
-                  .where((folder) => folder.name != '전체 메모')
-                  .map((folder) => ListTile(
-                        leading: const Icon(Icons.folder_outlined, color: Colors.amber),
-                        title: Text(folder.name),
-                        onTap: () async {
-                          Navigator.pop(context);
-                          
-                          // 선택된 모든 메모를 대상 폴더로 이동
-                          for (final memoId in _selectedMemoIds) {
-                            await memoProvider.moveMemoToFolder(memoId, folder.id);
-                          }
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${_selectedMemoIds.length}개의 메모가 이동되었습니다'),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                          
-                          // 현재 폴더의 메모 목록 갱신
-                          await memoProvider.loadMemosByFolder(folderProvider.currentFolderId);
-                          
-                          // 선택 모드 종료
-                          setState(() {
-                            _isSelectionMode = false;
-                            _selectedMemoIds.clear();
-                          });
-                        },
-                      ))
-                  .toList(),
             ],
           ),
         ),
@@ -591,10 +628,45 @@ class _MemoListScreenState extends State<MemoListScreen> {
     );
   }
 
+  // 새 폴더 추가 다이얼로그
+  void _showAddFolderDialog(BuildContext context) {
+    final textController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('새 폴더 추가'),
+        content: TextField(
+          controller: textController,
+          decoration: const InputDecoration(
+            hintText: '폴더명 입력',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = textController.text.trim();
+              if (name.isNotEmpty) {
+                final folderProvider = Provider.of<FolderProvider>(context, listen: false);
+                folderProvider.addFolder(name);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('추가'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // 정렬 옵션 메뉴 다이얼로그
   void _showSortOptions(BuildContext context) {
-    final memoProvider = Provider.of<MemoProvider>(context, listen: false);
-    final currentMemoSort = memoProvider.currentSortType;
+    final currentMemoSort = Provider.of<MemoProvider>(context, listen: false).currentSortType;
     
     showDialog(
       context: context,
@@ -610,7 +682,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
               onChanged: (value) {
                 Navigator.pop(context);
                 if (value != null) {
-                  memoProvider.changeSortType(value);
+                  Provider.of<MemoProvider>(context, listen: false).changeSortType(value);
                 }
               },
             ),
@@ -621,7 +693,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
               onChanged: (value) {
                 Navigator.pop(context);
                 if (value != null) {
-                  memoProvider.changeSortType(value);
+                  Provider.of<MemoProvider>(context, listen: false).changeSortType(value);
                 }
               },
             ),
@@ -632,7 +704,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
               onChanged: (value) {
                 Navigator.pop(context);
                 if (value != null) {
-                  memoProvider.changeSortType(value);
+                  Provider.of<MemoProvider>(context, listen: false).changeSortType(value);
                 }
               },
             ),
@@ -685,7 +757,7 @@ class BackgroundIconPainter extends CustomPainter {
             style: TextStyle(
               fontSize: iconSize,
               fontFamily: icons[iconIndex].fontFamily,
-              color: (colors[iconIndex] ?? Colors.grey[200])?.withOpacity(0.2),
+              color: (colors[iconIndex] ?? Colors.grey[200])?.withAlpha(51),
             ),
           ),
           textDirection: TextDirection.ltr,

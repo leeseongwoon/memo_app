@@ -1,10 +1,16 @@
 {
   "name": "memo-app",
   "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
   "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "flutter build web && node scripts/inject-env.js",
     "deploy": "npm run build && firebase deploy --only hosting"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "dotenv": "^16.4.5"
   }

@@ -6,6 +6,7 @@ import '../providers/memo_provider.dart';
 import '../providers/drawing_provider.dart';
 import '../utils/date_formatter.dart';
 import '../painters/drawing_preview_painter.dart';
+import '../widgets/confirm_dialog.dart';
 import 'drawing_screen.dart';
 
 // 한글 입력을 위한 특수 컨트롤러
@@ -186,6 +187,32 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
       
       // 메모 저장
       await _saveMemo();
+      
+      // 그림 상태 변경 알림 (메인 화면에서의 미리보기 업데이트를 위해)
+      _drawingProvider.notifyDrawingChanged(memoId);
+    } else if (result == null && _drawing != null) {
+      // result가 null이고 기존에 그림이 있었다면 그림이 삭제된 것임
+      setState(() {
+        _drawing = null;
+      });
+      
+      // 메모가 DB에 없는 임시 메모일 경우 실제로 생성
+      if (_memo != null && !await _memoProvider.memoExists(_memo!.id)) {
+        await _memoProvider.addMemo(_memo!);
+      }
+      
+      // 메모 저장
+      await _saveMemo();
+      
+      // 그림 상태 변경 알림 (미리보기 업데이트를 위해)
+      _drawingProvider.notifyDrawingChanged(memoId);
+      
+      // 삭제 알림 표시
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('그림이 삭제되었습니다')),
+        );
+      }
     }
   }
 
@@ -205,6 +232,12 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
           onPressed: () async {
             print("뒤로가기 버튼 클릭");
             await _saveMemo();
+            
+            // 그림 상태 변경 알림 (메인 화면에서의 미리보기 업데이트를 위해)
+            if (_memo != null && _drawing != null) {
+              _drawingProvider.notifyDrawingChanged(_memo!.id);
+            }
+            
             if (context.mounted) {
               Navigator.pop(context);
             }
@@ -228,25 +261,10 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
               tooltip: '그림 삭제',
               onPressed: _showDeleteDrawingDialog,
             ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'delete') {
-                _showDeleteConfirmDialog();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text('삭제'),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => _showDeleteConfirmDialog(),
+            tooltip: '메모 삭제',
           ),
         ],
       ),
@@ -312,7 +330,13 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: _drawing!.lines.isEmpty
                             ? const Center(child: Text('그림이 비어 있습니다'))
@@ -327,17 +351,7 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
                                     // 반투명한 오버레이
                                     Positioned.fill(
                                       child: Container(
-                                        color: Colors.black.withOpacity(0.05),
-                                        // child: const Center(
-                                        //   child: Text(
-                                        //     '탭하여 편집',
-                                        //     style: TextStyle(
-                                        //       color: Colors.black54,
-                                        //       fontSize: 14,
-                                        //       fontWeight: FontWeight.w500,
-                                        //     ),
-                                        //   ),
-                                        // ),
+                                        color: Colors.black.withAlpha(13),
                                       ),
                                     ),
                                   ],
@@ -351,76 +365,37 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
     );
   }
 
-  Future<void> _saveAndShowFeedback() async {
-    await _saveMemo();
-    
-    if (!context.mounted) return;
-    
-    // 저장 완료 피드백 표시
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('메모가 저장되었습니다'),
-        duration: Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showDeleteConfirmDialog() {
-    showDialog(
+  Future<void> _showDeleteConfirmDialog() {
+    return showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('메모 삭제'),
-        content: const Text('이 메모를 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              if (_memo != null) {
-                await _memoProvider.deleteMemo(_memo!.id);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              } else {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+      title: '메모 삭제',
+      content: '이 메모를 삭제하시겠습니까?',
+      confirmText: '삭제',
+      isDangerous: true,
+      onConfirm: () async {
+        if (_memo != null) {
+          await _memoProvider.deleteMemo(_memo!.id);
+          if (context.mounted) {
+            Navigator.pop(context);
+          }
+        } else {
+          Navigator.pop(context);
+        }
+      },
     );
   }
 
   // 그림 삭제 확인 대화상자
   void _showDeleteDrawingDialog() {
-    showDialog(
+    showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('그림 삭제'),
-        content: const Text('이 메모에서 그림을 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteDrawing();
-            },
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+      title: '그림 삭제',
+      content: '이 메모에서 그림을 삭제하시겠습니까?',
+      confirmText: '삭제',
+      isDangerous: true,
+      onConfirm: () {
+        _deleteDrawing();
+      },
     );
   }
   
@@ -428,19 +403,55 @@ class _MemoDetailScreenState extends State<MemoDetailScreen> {
   Future<void> _deleteDrawing() async {
     try {
       if (_memo != null && _drawing != null) {
-        await _drawingProvider.deleteDrawing(_memo!.id);
+        final String memoId = _memo!.id;
+        final drawingId = _drawing!.id; // 그림 ID 저장
+        
+        // 먼저 로컬 참조 제거
+        Drawing? oldDrawing = _drawing;
+        
+        // 로컬 UI 즉시 업데이트
         setState(() {
           _drawing = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('그림이 삭제되었습니다')),
-        );
+        
+        // 먼저 그림 제공자에서 메모리 캐시 강제 삭제
+        _drawingProvider.forceClearDrawing(memoId);
+        
+        // 상태 변경 즉시 알림 (미리보기 업데이트를 위한 첫 번째 알림)
+        _drawingProvider.notifyDrawingChanged(memoId);
+        
+        // Hive에서 직접 삭제
+        await _drawingProvider.deleteDrawingDirectly(drawingId);
+        
+        // 백그라운드에서 실제 삭제 수행 (자체 로직 추가로 호출)
+        await _drawingProvider.deleteDrawing(memoId);
+        
+        // 메모도 함께 저장하여 업데이트
+        await _saveMemo();
+        
+        // 한 번 더 알림 (모든 작업 완료 후 최종 알림)
+        _drawingProvider.notifyDrawingChanged(memoId);
+        
+        // 약간의 지연 후 다시 한번 알림 (UI 갱신 보장)
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _drawingProvider.notifyDrawingChanged(memoId);
+          }
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('그림이 삭제되었습니다')),
+          );
+        }
       }
     } catch (e) {
       print('그림 삭제 오류: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('그림 삭제 중 오류가 발생했습니다')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('그림 삭제 중 오류가 발생했습니다')),
+        );
+      }
     }
   }
 } 

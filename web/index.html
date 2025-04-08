@@ -26,6 +26,9 @@
   <meta name="apple-mobile-web-app-title" content="memo_app">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
+  <!-- Material Icons font -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
@@ -38,16 +41,10 @@
   </script>
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
-  
-  <!-- Load environment variables -->
-  <script>
-    window.FIREBASE_API_KEY = '__FIREBASE_API_KEY__';  // This will be replaced during build
-  </script>
 </head>
 <body>
   <script>
     window.addEventListener('load', function(ev) {
-      // Download main.dart.js
       _flutter.loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
@@ -59,32 +56,6 @@
         }
       });
     });
-  </script>
-
-  <!-- Firebase SDK -->
-  <script type="module">
-    // Import the functions you need from the SDKs you need
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
-
-    // Your web app's Firebase configuration
-    const firebaseConfig = {
-      apiKey: window.FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
-      authDomain: "memo-app-bfad2.firebaseapp.com",
-      projectId: "memo-app-bfad2",
-      storageBucket: "memo-app-bfad2.firebasestorage.app",
-      messagingSenderId: "133412454072",
-      appId: "1:133412454072:web:014b11a44ebb40297abe4d",
-      measurementId: "G-ZRJH7JEQM3"
-    };
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
-
-    // Firebase 객체를 전역으로 사용할 수 있도록 설정
-    window.firebaseApp = app;
-    window.firebaseAnalytics = analytics;
   </script>
 </body>
 </html>

@@ -20,7 +20,7 @@ class FolderList extends StatefulWidget {
 
 class _FolderListState extends State<FolderList> {
   // 확장된 폴더 ID 저장
-  Set<String> _expandedFolders = {};
+  final Set<String> _expandedFolders = {};
   
   @override
   void initState() {
@@ -57,7 +57,7 @@ class _FolderListState extends State<FolderList> {
                 horizontal: 16.0,
                 vertical: 12.0,
               ),
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withAlpha(26),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -105,7 +105,7 @@ class _FolderListState extends State<FolderList> {
                     // 전체 메모 항목 (루트 폴더)
                     Container(
                       color: currentFolderId.isEmpty 
-                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                        ? Theme.of(context).colorScheme.primary.withAlpha(26)
                         : null,
                       child: Column(
                         children: [
@@ -117,7 +117,7 @@ class _FolderListState extends State<FolderList> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                    color: Theme.of(context).colorScheme.primary.withAlpha(51),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -175,7 +175,7 @@ class _FolderListState extends State<FolderList> {
                       
                       return Container(
                         color: currentFolderId == folder.id 
-                          ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                          ? Theme.of(context).colorScheme.primary.withAlpha(26)
                           : null,
                         child: Column(
                           children: [
@@ -187,7 +187,7 @@ class _FolderListState extends State<FolderList> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                      color: Theme.of(context).colorScheme.primary.withAlpha(51),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -242,7 +242,7 @@ class _FolderListState extends State<FolderList> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),

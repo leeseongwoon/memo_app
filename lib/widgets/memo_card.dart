@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/memo.dart';
-import '../models/folder.dart';
 import '../models/drawing.dart';
 import '../providers/memo_provider.dart';
 import '../providers/folder_provider.dart';
@@ -49,7 +48,7 @@ class MemoCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
             border: Border.all(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withAlpha(51),
               width: 0.5,
             ),
           ),
@@ -79,41 +78,15 @@ class MemoCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           height: 1.5,
+                          color: Colors.black87,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Consumer<DrawingProvider>(
                       builder: (context, drawingProvider, child) {
-                        return FutureBuilder<Drawing?>(
-                          future: drawingProvider.getDrawingByMemoId(memo.id),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData && snapshot.data != null && snapshot.data!.lines.isNotEmpty) {
-                              return Container(
-                                width: 40,
-                                height: 40,
-                                margin: const EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.grey.withOpacity(0.2),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: CustomPaint(
-                                    painter: DrawingPreviewPainter(snapshot.data!.lines),
-                                    size: const Size(40, 40),
-                                  ),
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        );
+                        return _DrawingPreview(memoId: memo.id);
                       },
                     ),
                   ],
@@ -178,7 +151,7 @@ class MemoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.deepPurple.withOpacity(0.1),
+        color: Colors.deepPurple.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -204,6 +177,73 @@ class MemoCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DrawingPreview extends StatelessWidget {
+  final String memoId;
+
+  const _DrawingPreview({Key? key, required this.memoId}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // 항상 최신 상태를 반영하도록 listen: true 유지
+    final drawingProvider = Provider.of<DrawingProvider>(context, listen: true);
+    
+    // 마지막 변경 ID에 기반한 고유 키 생성
+    final lastChanged = drawingProvider.lastChangedMemoId;
+    
+    // lastChanged에 현재 memoId가 포함되어 있으면 즉시 갱신 필요
+    final needsImmediate = lastChanged.contains(memoId);
+    
+    // 고유한 키 생성 (lastChangedMemoId가 변경될 때마다 강제 업데이트)
+    final uniqueKey = 'drawing_${memoId}_${drawingProvider.lastChangedMemoId}';
+    
+    print('미리보기 그리기: $memoId, 마지막 변경: $lastChanged, 즉시 갱신 필요: $needsImmediate');
+    
+    return FutureBuilder<Drawing?>(
+      // 고유 키를 사용하여 cache 무시
+      key: ValueKey(uniqueKey),
+      future: Future(() async {
+        if (needsImmediate) {
+          // 이 메모의 변경인 경우, 약간 지연 후 다시 확인 (삭제 반영 보장)
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+        
+        // Hive에서 최신 데이터 로드
+        return drawingProvider.getDrawingByMemoId(memoId);
+      }),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink(); // 로딩 중에는 빈 공간
+        }
+        
+        // 그림이 있고, 내용이 비어있지 않은 경우에만 표시
+        if (snapshot.hasData && snapshot.data != null && snapshot.data!.lines.isNotEmpty) {
+          return Container(
+            width: 40,
+            height: 40,
+            margin: const EdgeInsets.only(left: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.grey.withAlpha(51),
+                width: 1,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CustomPaint(
+                painter: DrawingPreviewPainter(snapshot.data!.lines),
+                size: const Size(40, 40),
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 } 

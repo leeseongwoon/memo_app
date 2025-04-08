@@ -9,23 +9,33 @@ import 'providers/folder_provider.dart';
 import 'providers/drawing_provider.dart';
 import 'screens/memo_list_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+  
   // Firebase 초기화
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-      appId: '1:XXXXXXXXXXXX:web:XXXXXXXXXXXXXXXXXXXXXXXX',
-      messagingSenderId: 'XXXXXXXXXXXX',
-      projectId: 'memo-app-bfad2',
-      authDomain: 'memo-app-bfad2.firebaseapp.com',
-      storageBucket: 'memo-app-bfad2.appspot.com',
+    options: FirebaseOptions(
+      apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
+      appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
+      messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
+      projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
+      authDomain: dotenv.env['FIREBASE_AUTH_DOMAIN'] ?? '',
+      storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '',
     ),
   );
-  
+
+  // Firestore 설정
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
   // Hive 초기화
   await Hive.initFlutter();
   
