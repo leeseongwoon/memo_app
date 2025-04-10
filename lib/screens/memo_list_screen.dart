@@ -362,7 +362,7 @@ class _MemoListScreenState extends State<MemoListScreen> {
       title: Text('${_selectedMemoIds.length}개 선택됨'),
       actions: [
         IconButton(
-          icon: const Icon(Icons.done_all_rounded, color: Colors.deepPurple),
+          icon: Icon(Icons.done_all_rounded, color: Theme.of(context).colorScheme.primary),
           onPressed: _toggleSelectAll,
           tooltip: '전체 선택',
         ),
